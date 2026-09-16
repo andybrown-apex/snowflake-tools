@@ -7,6 +7,7 @@ Snowflake tooling scripts, functions, and other utilities.
 | Tool | Description |
 |------|-------------|
 | [key-utils](key-utils/) | RSA key pair generation, validation, fingerprinting, and PEM formatting as Snowflake Python UDFs. Generate and manage key-pair authentication credentials without leaving Snowflake. |
+| [key-utils/automation](key-utils/automation/) | Automated key rotation scripts and stored procedures for AWS Secrets Manager, Azure Key Vault, and Google Cloud Secret Manager. |
 
 ## Author
 

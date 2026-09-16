@@ -4,7 +4,7 @@ RSA key pair generation, validation, and PEM formatting as Snowflake Python UDFs
 
 ## Why
 
-Snowflake's key-pair authentication requires RSA keys in a specific format: base64-encoded, no PEM headers, no line breaks. Managing this typically means shelling out to `openssl`, copying keys between systems, and hoping nothing gets corrupted in transit.
+Snowflake's [key-pair authentication](https://docs.snowflake.com/en/user-guide/key-pair-auth) requires RSA keys in a specific format: base64-encoded, no PEM headers, no line breaks. Managing this typically means shelling out to `openssl`, copying keys between systems, and hoping nothing gets corrupted in transit.
 
 These UDFs let you generate, validate, format, and fingerprint RSA keys directly inside Snowflake. Keys are created in memory on Snowflake compute and never touch disk or leave your account.
 
@@ -183,12 +183,24 @@ FROM KEY_PAIR;
 
 `STRIP_PEM_HEADERS`, `FORMAT_PEM`, and `FINGERPRINT_KEY` use only Python standard library modules and have no external package dependency.
 
+## Automation
+
+For automated key rotation with private keys stored in an external vault (AWS Secrets Manager, Azure Key Vault, or Google Cloud Secret Manager), see [automation/](automation/). Available as standalone Python scripts and as Snowflake stored procedures with external access integrations.
+
 ## Security Notes
 
 - Keys are generated in memory on Snowflake compute nodes and returned as query results. They are never written to disk or stages.
 - All functions are created with `SECURE` to prevent definition inspection by non-owners.
 - The private key is returned in the query result. Treat it with the same care as any private key — store it as a Snowflake secret or retrieve it in a secure client session.
 - These functions do not store, log, or transmit any key material.
+
+## Related Snowflake Documentation
+
+- [Key-pair authentication](https://docs.snowflake.com/en/user-guide/key-pair-auth) — Overview of RSA key-pair auth and the key format Snowflake expects
+- [ALTER USER](https://docs.snowflake.com/en/sql-reference/sql/alter-user) — Assigning public keys via `RSA_PUBLIC_KEY` and `RSA_PUBLIC_KEY_2`
+- [CREATE SECRET](https://docs.snowflake.com/en/sql-reference/sql/create-secret) — Storing private keys as Snowflake secret objects
+- [CREATE USER](https://docs.snowflake.com/en/sql-reference/sql/create-user) — Creating service users with `TYPE = SERVICE`
+- [Python UDFs](https://docs.snowflake.com/en/developer-guide/udf/python/udf-python-introduction) — How Python UDFs work in Snowflake
 
 ## License
 
