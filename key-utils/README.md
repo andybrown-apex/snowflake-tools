@@ -37,7 +37,13 @@ Or paste them into a Snowflake worksheet and execute.
 -- Generate
 SELECT GENERATE_RSA_KEY_PAIR(2048) AS KP;
 
--- Extract the public key and assign to a user
+-- Extract the public and private keys individually
+SELECT
+    KP:public_key::VARCHAR  AS PUBLIC_KEY
+    ,KP:private_key::VARCHAR AS PRIVATE_KEY
+FROM (SELECT GENERATE_RSA_KEY_PAIR(2048) AS KP);
+
+-- Assign the public key to a user
 SET PUBLIC_KEY = (
     SELECT KP:public_key::VARCHAR
     FROM (SELECT GENERATE_RSA_KEY_PAIR(2048) AS KP)
