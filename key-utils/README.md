@@ -46,16 +46,86 @@ SET PUBLIC_KEY = (
 ALTER USER MY_SERVICE_ACCOUNT SET RSA_PUBLIC_KEY = $PUBLIC_KEY;
 ```
 
-### Store the private key as a Snowflake secret
+### Programmatic key provisioning for a user
+
+This is the full workflow for setting up key-pair authentication on a Snowflake user entirely in SQL — no `openssl`, no local files, no copy-paste.
+
+**Step 1: Create the user (if it doesn't exist)**
 
 ```sql
--- Generate and store in one step
+CREATE USER IF NOT EXISTS SVC_DATA_PIPELINE
+    TYPE = SERVICE
+    COMMENT = 'Service account for the data pipeline';
+
+GRANT ROLE RL_ETL TO USER SVC_DATA_PIPELINE;
+```
+
+**Step 2: Generate a key pair and assign the public key**
+
+```sql
+-- Generate and capture the key pair into a session variable
 SET KP = (SELECT GENERATE_RSA_KEY_PAIR(2048));
 
-CREATE SECRET MY_DB.MY_SCHEMA.SK_SERVICE_ACCOUNT_KEY
+-- Assign the public key to the user
+ALTER USER SVC_DATA_PIPELINE SET RSA_PUBLIC_KEY = $KP:public_key::VARCHAR;
+```
+
+**Step 3: Store the private key as a Snowflake secret**
+
+```sql
+CREATE SECRET IF NOT EXISTS MY_DB.SECRETS.SK_SVC_DATA_PIPELINE
     TYPE = GENERIC_STRING
     SECRET_STRING = $KP:private_key::VARCHAR
-    COMMENT = 'Private key for MY_SERVICE_ACCOUNT';
+    COMMENT = 'Private key for SVC_DATA_PIPELINE key-pair auth';
+```
+
+The private key is now stored server-side in a secret object. Your application retrieves it at runtime — it never needs to exist as a file.
+
+**Step 4: Verify the key was assigned**
+
+```sql
+DESCRIBE USER SVC_DATA_PIPELINE;
+-- Look for RSA_PUBLIC_KEY — should show the key fingerprint
+
+-- Or validate the assigned key directly
+SELECT VALIDATE_RSA_PUBLIC_KEY($KP:public_key::VARCHAR);
+```
+
+**Step 5: Fingerprint for audit tracking**
+
+```sql
+SELECT FINGERPRINT_KEY($KP:public_key::VARCHAR, 'SHA256') AS KEY_FINGERPRINT;
+-- Store this fingerprint alongside your deployment records for traceability
+```
+
+**Step 6: Clean up the session variable**
+
+```sql
+UNSET KP;
+```
+
+The session variable held the private key in memory. Unsetting it removes it from the session. The private key now exists only in the secret object.
+
+### Key rotation
+
+To rotate a key without downtime, Snowflake supports two simultaneous public keys (`RSA_PUBLIC_KEY` and `RSA_PUBLIC_KEY_2`). Generate a new pair, assign it to the second slot, migrate your application, then remove the old key.
+
+```sql
+-- Generate a new key pair
+SET NEW_KP = (SELECT GENERATE_RSA_KEY_PAIR(2048));
+
+-- Assign to the second key slot (old key still works)
+ALTER USER SVC_DATA_PIPELINE SET RSA_PUBLIC_KEY_2 = $NEW_KP:public_key::VARCHAR;
+
+-- Update the stored secret with the new private key
+ALTER SECRET MY_DB.SECRETS.SK_SVC_DATA_PIPELINE SET SECRET_STRING = $NEW_KP:private_key::VARCHAR;
+
+-- After confirming the application connects with the new key,
+-- promote the new key to the primary slot and remove the old one
+ALTER USER SVC_DATA_PIPELINE SET RSA_PUBLIC_KEY = $NEW_KP:public_key::VARCHAR;
+ALTER USER SVC_DATA_PIPELINE UNSET RSA_PUBLIC_KEY_2;
+
+UNSET NEW_KP;
 ```
 
 ### Validate a public key before assigning it
