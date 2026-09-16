@@ -34,22 +34,16 @@ Or paste them into a Snowflake worksheet and execute.
 ### Generate a key pair and assign it to a service account
 
 ```sql
--- Generate
-SELECT GENERATE_RSA_KEY_PAIR(2048) AS KP;
+-- Generate once and capture into a session variable
+SET KP = (SELECT GENERATE_RSA_KEY_PAIR(2048));
 
 -- Extract the public and private keys individually
 SELECT
-    KP:public_key::VARCHAR  AS PUBLIC_KEY
-    ,KP:private_key::VARCHAR AS PRIVATE_KEY
-FROM (SELECT GENERATE_RSA_KEY_PAIR(2048) AS KP);
+    $KP:public_key::VARCHAR  AS PUBLIC_KEY
+    ,$KP:private_key::VARCHAR AS PRIVATE_KEY;
 
 -- Assign the public key to a user
-SET PUBLIC_KEY = (
-    SELECT KP:public_key::VARCHAR
-    FROM (SELECT GENERATE_RSA_KEY_PAIR(2048) AS KP)
-);
-
-ALTER USER MY_SERVICE_ACCOUNT SET RSA_PUBLIC_KEY = $PUBLIC_KEY;
+ALTER USER MY_SERVICE_ACCOUNT SET RSA_PUBLIC_KEY = $KP:public_key::VARCHAR;
 ```
 
 ### Programmatic key provisioning for a user
